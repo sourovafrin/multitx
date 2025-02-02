@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Multi-Chain Transfer (DOGE, LTC, BCH)</title>
+    <link
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="container mt-5">
+      <h1 class="mb-4">Multi-Chain Transfer</h1>
+      <button id="connectWalletButton" class="btn btn-primary mb-3">
+        Connect Wallet
+      </button>
+      <div id="accountAddresses"></div>
+
+      <label for="chainSelect">Select Chain:</label>
+      <select id="chainSelect" class="form-control mb-3" disabled>
+        <option value="" disabled selected>Select a chain</option>
+        <option value="dogecoin">Dogecoin (DOGE)</option>
+        <option value="litecoin">Litecoin (LTC)</option>
+        <option value="bitcoincash">Bitcoin Cash (BCH)</option>
+      </select>
+
+      <form id="transactionForm" style="display: none">
+        <label for="recipient">Recipient Address:</label>
+        <input type="text" id="recipient" class="form-control" readonly /><br />
+
+        <label for="amountInput">Amount:</label>
+        <input
+          type="number"
+          id="amountInput"
+          value="5"
+          step="0.01"
+          class="form-control"
+          required
+        /><br />
+
+        <label for="memoInput">Memo:</label>
+        <input type="text" id="memoInput" class="form-control" readonly /><br />
+
+        <button type="submit" class="btn btn-success">
+          Submit Transaction
+        </button>
+      </form>
+
+      <div id="statusMessage"></div>
+    </div>
+
+    <script>
+      let addresses = {
+        dogecoin: null,
+        litecoin: null,
+        bitcoincash: null,
+        thorchain: null,
+      }
+      let inboundAddresses = {}
+
+      async function fetchThorchainAddress() {
+        if (window.xfi?.thorchain) {
+          window.xfi.thorchain.request(
+            { method: "request_accounts", params: [] },
+            (error, accounts) => {
+              if (!error && accounts?.[0]) {
+                addresses.thorchain = accounts[0]
+                updateMemoField()
+              }
+            }
+          )
+        }
+      }
+
+      async function fetchInboundAddresses() {
+        try {
+          const response = await fetch(
+            "https://thornode.ninerealms.com/thorchain/inbound_addresses"
+          )
+          const data = await response.json()
+          inboundAddresses = Object.fromEntries(
+            data.map((entry) => [entry.chain.toLowerCase(), entry.address])
+          )
+          updateRecipientField()
+        } catch (error) {
+          console.error("Error fetching inbound addresses:", error)
+        }
+      }
+
+      function updateRecipientField() {
+        const selectedChain = document.getElementById("chainSelect").value
+        var chainKey = "null"
+        if (selectedChain === "bitcoincash") {
+          chainKey = "bch"
+        } else if (selectedChain === "dogecoin") {
+          chainKey = "doge"
+        } else if (selectedChain === "litecoin") {
+          chainKey = "ltc"
+        }
+        if (selectedChain && inboundAddresses[chainKey]) {
+          document.getElementById("recipient").value =
+            inboundAddresses[chainKey]
+        } else {
+          document.getElementById("recipient").value = "Fetching address..."
+        }
+      }
+
+      function updateMemoField() {
+        document.getElementById("memoInput").value = `TRADE+:${
+          addresses.thorchain || "Fetching..."
+        }`
+      }
+
+      async function connectWallet() {
+        if (!window.xfi) {
+          document.getElementById("statusMessage").innerText =
+            "Ctrl Wallet is not installed or unsupported."
+          return
+        }
+
+        let accountContainer = document.getElementById("accountAddresses")
+        accountContainer.innerHTML = ""
+
+        const chains = ["dogecoin", "litecoin", "bitcoincash"]
+        let connected = false
+
+        for (let chain of chains) {
+          if (window.xfi[chain]) {
+            window.xfi[chain].request(
+              { method: "request_accounts", params: [] },
+              (error, accounts) => {
+                if (!error && accounts?.[0]) {
+                  addresses[chain] = accounts[0]
+                  connected = true
+                  accountContainer.innerHTML += `<p><strong>${chain.toUpperCase()} Address:</strong> ${
+                    accounts[0]
+                  }</p>`
+                }
+              }
+            )
+          }
+        }
+
+        await fetchThorchainAddress()
+        setTimeout(() => {
+          if (connected) {
+            document.getElementById("chainSelect").disabled = false
+            document.getElementById("connectWalletButton").style.display =
+              "none"
+          } else {
+            document.getElementById("statusMessage").innerText =
+              "No chains connected."
+          }
+        }, 1000)
+      }
+
+      document
+        .getElementById("chainSelect")
+        .addEventListener("change", function () {
+          updateRecipientField()
+          document.getElementById("transactionForm").style.display = addresses[
+            this.value
+          ]
+            ? "block"
+            : "none"
+          updateMemoField()
+        })
+
+      document
+        .getElementById("transactionForm")
+        .addEventListener("submit", function (e) {
+          e.preventDefault()
+
+          const selectedChain = document.getElementById("chainSelect").value
+          if (!selectedChain || !addresses[selectedChain]) {
+            document.getElementById("statusMessage").innerText =
+              "Please select a valid chain and connect your wallet."
+            return
+          }
+
+          const recipient = document.getElementById("recipient").value
+          const amount = parseFloat(
+            document.getElementById("amountInput").value
+          )
+          const memo = document.getElementById("memoInput").value
+
+          const asset = {
+            chain: selectedChain.toUpperCase(),
+            symbol: selectedChain.toUpperCase(),
+            ticker: selectedChain.toUpperCase(),
+          }
+          const transactionParams = {
+            asset,
+            from: addresses[selectedChain],
+            recipient,
+            amount: { amount: amount * 1e8, decimals: 8 },
+            memo,
+          }
+
+          window.xfi[selectedChain].request(
+            { method: "transfer", params: [transactionParams] },
+            function (error, result) {
+              document.getElementById("statusMessage").innerText = error
+                ? `Transaction failed: ${error.message}`
+                : `Transaction successful! Tx ID: ${result.txid}`
+            }
+          )
+        })
+
+      document
+        .getElementById("connectWalletButton")
+        .addEventListener("click", connectWallet)
+      setInterval(fetchInboundAddresses, 300000)
+      fetchInboundAddresses()
+    </script>
+  </body>
+</html>
