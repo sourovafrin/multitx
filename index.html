@@ -203,7 +203,7 @@
             function (error, result) {
               document.getElementById("statusMessage").innerText = error
                 ? `Transaction failed: ${error.message}`
-                : `Transaction successful! Tx ID: ${result.txid}`
+                : `Transaction successful! Tx ID: ${result}`
             }
           )
         })
