@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Multi-Chain Transfer (DOGE, LTC, BCH)</title>
+    <title>Multi-Chain Transfer (BTC, DOGE, LTC, BCH)</title>
     <link
       href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
       rel="stylesheet"
@@ -20,6 +20,7 @@
       <label for="chainSelect">Select Chain:</label>
       <select id="chainSelect" class="form-control mb-3" disabled>
         <option value="" disabled selected>Select a chain</option>
+        <option value="bitcoin">Bitcoin (BTC)</option>
         <option value="dogecoin">Dogecoin (DOGE)</option>
         <option value="litecoin">Litecoin (LTC)</option>
         <option value="bitcoincash">Bitcoin Cash (BCH)</option>
@@ -52,6 +53,7 @@
 
     <script>
       let addresses = {
+        bitcoin: null,
         dogecoin: null,
         litecoin: null,
         bitcoincash: null,
@@ -90,14 +92,12 @@
 
       function updateRecipientField() {
         const selectedChain = document.getElementById("chainSelect").value
-        var chainKey = "null"
-        if (selectedChain === "bitcoincash") {
-          chainKey = "bch"
-        } else if (selectedChain === "dogecoin") {
-          chainKey = "doge"
-        } else if (selectedChain === "litecoin") {
-          chainKey = "ltc"
-        }
+        let chainKey = ""
+        if (selectedChain === "bitcoincash") chainKey = "bch"
+        else if (selectedChain === "dogecoin") chainKey = "doge"
+        else if (selectedChain === "litecoin") chainKey = "ltc"
+        else if (selectedChain === "bitcoin") chainKey = "btc"
+
         if (selectedChain && inboundAddresses[chainKey]) {
           document.getElementById("recipient").value =
             inboundAddresses[chainKey]
@@ -122,7 +122,7 @@
         let accountContainer = document.getElementById("accountAddresses")
         accountContainer.innerHTML = ""
 
-        const chains = ["dogecoin", "litecoin", "bitcoincash"]
+        const chains = ["bitcoin", "dogecoin", "litecoin", "bitcoincash"]
         let connected = false
 
         for (let chain of chains) {
